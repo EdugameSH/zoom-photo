@@ -613,17 +613,17 @@ function openRevealModal(){
   const ih=currentImage.naturalHeight;
 
   // 이미지 비율 유지하면서 가용 공간에 맞추기
-  const scale=Math.min(availW/iw, availH/ih, 1); // 원본보다 크게 늘리지 않음 (단, 작은 화면엔 맞춤)
-  const cssW=Math.round(iw*scale);
-  const cssH=Math.round(ih*scale);
+  // 가용 공간을 꽉 채우도록 (원본보다 크게 늘려도 됨)
+  const scale = Math.min(availW / iw, availH / ih);
+  const cssW = Math.round(iw * scale);
+  const cssH = Math.round(ih * scale);
 
-  canvas.style.width =cssW+'px';
-  canvas.style.height=cssH+'px';
-  canvas.width =Math.round(cssW*dpr);
-  canvas.height=Math.round(cssH*dpr);
+  canvas.style.width  = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.width  = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
 
-  const ctx=canvas.getContext('2d');
-  // 원본 이미지를 DPR 반영 크기로 그대로 그리기
+  const ctx = canvas.getContext('2d');
   ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
 
   document.getElementById('modalAnswer').textContent=items[queue[cur]].answer;
