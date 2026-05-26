@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>사진 맞추기 게임</title>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0e17;
+    --surface: #1a1829;
+    --card: #221f35;
+    --accent: #ff6b6b;
+    --accent2: #ffd93d;
+    --accent3: #6bcb77;
+    --text: #fffffe;
+    --muted: #a7a9be;
+    --border: rgba(255,255,255,0.08);
+    --radius: 16px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: -200px; left: -200px;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(255,107,107,0.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  body::after {
+    content: '';
+    position: fixed;
+    bottom: -200px; right: -200px;
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(107,203,119,0.1) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .screen { display: none; }
+  .screen.active { display: flex; flex-direction: column; min-height: 100vh; }
+
+  h1 {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: clamp(2rem, 6vw, 3.5rem);
+    letter-spacing: -1px;
+  }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 14px 28px;
+    border: none; border-radius: 50px; cursor: pointer;
+    font-family: 'Noto Sans KR', sans-serif; font-size: 1rem; font-weight: 700;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .btn:hover { transform: translateY(-2px); }
+  .btn:active { transform: translateY(0); }
+  .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 4px 20px rgba(255,107,107,0.4); }
+  .btn-primary:hover { box-shadow: 0 6px 28px rgba(255,107,107,0.6); }
+  .btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+  .btn-yellow { background: var(--accent2); color: #0f0e17; box-shadow: 0 4px 20px rgba(255,217,61,0.4); }
+
+  /* ══ SCREEN 1: 홈 ══ */
+  #screen-home {
+    align-items: center; justify-content: center;
+    padding: 40px 20px; text-align: center; gap: 16px;
+  }
+  #screen-home .eyebrow {
+    font-size: 0.85rem; letter-spacing: 4px; color: var(--accent);
+    text-transform: uppercase; font-weight: 700;
+  }
+  #screen-home h1 span { color: var(--accent); }
+  #screen-home p { color: var(--muted); font-size: 1.05rem; max-width: 420px; line-height: 1.7; }
+  #screen-home .actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+
+  .floating-icons { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+  .fi {
+    position: absolute; font-size: 2rem; opacity: 0.06;
+    animation: floatUp linear infinite;
+  }
+  @keyframes floatUp {
+    from { transform: translateY(110vh) rotate(0deg); }
+    to   { transform: translateY(-10vh) rotate(360deg); }
+  }
+
+  /* ══ SCREEN 2: 빌더 ══ */
+  #screen-builder { padding: 40px 20px; gap: 24px; align-items: center; }
+  #screen-builder h2 { font-family: 'Black Han Sans', sans-serif; font-size: 1.8rem; }
+  #screen-builder h2 span { color: var(--accent); }
+
+  .builder-wrap { width: 100%; max-width: 700px; display: flex; flex-direction: column; gap: 16px; }
+
+  .drop-zone {
+    border: 2px dashed rgba(255,107,107,0.4);
+    border-radius: var(--radius);
+    padding: 48px 24px; text-align: center; cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    background: rgba(255,107,107,0.03);
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent); background: rgba(255,107,107,0.07);
+  }
+  .drop-zone .dz-icon { font-size: 2.5rem; margin-bottom: 10px; }
+  .drop-zone p { color: var(--muted); font-size: 0.95rem; }
+  .drop-zone strong { color: var(--text); }
+  #file-input { display: none; }
+
+  .card-list { display: flex; flex-direction: column; gap: 12px; }
+  .photo-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px;
+    display: flex; align-items: center; gap: 14px;
+    animation: slideIn 0.25s ease;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-12px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  .photo-card .thumb {
+    width: 64px; height: 64px;
+    border-radius: 10px; object-fit: cover; flex-shrink: 0;
+    border: 2px solid var(--border);
+  }
+  .photo-card .info { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+  .photo-card .fname { font-size: 0.78rem; color: var(--muted); }
+  .photo-card input {
+    background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 12px;
+    color: var(--text); font-family: 'Noto Sans KR', sans-serif;
+    font-size: 0.95rem; outline: none; transition: border-color 0.2s; width: 100%;
+  }
+  .photo-card input:focus { border-color: var(--accent); }
+  .photo-card input::placeholder { color: var(--muted); }
+  .photo-card .del-btn {
+    background: none; border: none; color: var(--muted);
+    font-size: 1.2rem; cursor: pointer; padding: 4px;
+    transition: color 0.15s; flex-shrink: 0;
+  }
+  .photo-card .del-btn:hover { color: var(--accent); }
+
+  .builder-footer {
+    width: 100%; max-width: 700px;
+    display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap;
+  }
+
+  /* ══ SCREEN 3: 게임 ══ */
+  #screen-game { padding: 24px 20px; gap: 20px; align-items: center; }
+
+  .game-header {
+    width: 100%; max-width: 500px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .progress-text {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 1.1rem; color: var(--muted);
+  }
+  .progress-text span { color: var(--text); font-size: 1.4rem; }
+
+  /* 이미지 박스 */
+  .image-box {
+    width: 100%; max-width: 500px;
+    aspect-ratio: 1/1;
+    border-radius: 20px; overflow: hidden;
+    position: relative; border: 2px solid var(--border);
+    background: var(--card);
+  }
+  .image-box img {
+    width: 100%; height: 100%;
+    object-fit: cover; display: block;
+    transform-origin: center center;
+    transition: transform 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* 정답 표시 배너 */
+  .answer-banner {
+    width: 100%; max-width: 500px;
+    background: var(--card);
+    border: 1px solid rgba(255,217,61,0.3);
+    border-radius: 14px;
+    padding: 16px 24px;
+    text-align: center;
+    display: none;
+    animation: fadeSlideUp 0.4s ease;
+  }
+  .answer-banner.visible { display: block; }
+  @keyframes fadeSlideUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .answer-banner .ab-label {
+    font-size: 0.78rem; letter-spacing: 3px; color: var(--muted);
+    text-transform: uppercase; font-weight: 700; margin-bottom: 6px;
+  }
+  .answer-banner .ab-answer {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 1.8rem; color: var(--accent2);
+    letter-spacing: -0.5px;
+  }
+
+  /* 힌트 버튼 */
+  .hint-row {
+    width: 100%; max-width: 500px;
+    display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+  }
+  .hint-btn {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 50px; padding: 10px 22px;
+    color: var(--muted); font-size: 0.9rem; font-weight: 700;
+    cursor: pointer; transition: all 0.2s;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .hint-btn:hover:not(:disabled) { border-color: var(--accent2); color: var(--accent2); }
+  .hint-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .hint-btn.used { border-color: var(--accent2); color: var(--accent2); }
+  .hint-btn.reveal {
+    background: var(--accent2); color: #0f0e17;
+    border-color: var(--accent2);
+    box-shadow: 0 4px 16px rgba(255,217,61,0.35);
+  }
+  .hint-btn.reveal:hover:not(:disabled) { box-shadow: 0 6px 24px rgba(255,217,61,0.55); }
+
+  /* 다음 버튼 */
+  .next-row {
+    width: 100%; max-width: 500px;
+    display: flex; justify-content: center;
+  }
+
+  /* ══ SCREEN 4: 마무리 ══ */
+  #screen-result {
+    align-items: center; justify-content: center;
+    padding: 40px 20px; text-align: center; gap: 20px;
+  }
+  .result-emoji { font-size: 4rem; }
+  #screen-result h2 {
+    font-family: 'Black Han Sans', sans-serif; font-size: 2.2rem;
+  }
+  #screen-result p { color: var(--muted); font-size: 1rem; line-height: 1.7; max-width: 380px; }
+  #screen-result .actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+
+  @media (max-width: 480px) {
+    .photo-card { flex-wrap: wrap; }
+    .photo-card .thumb { width: 100%; height: 160px; border-radius: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="floating-icons" id="floatingIcons"></div>
+
+<!-- ══ SCREEN 1: 홈 ══ -->
+<div id="screen-home" class="screen active">
+  <p class="eyebrow">Photo Quiz Game</p>
+  <h1>사진 보고<br><span>맞춰보세요!</span></h1>
+  <p>사진을 업로드하고 정답을 입력하면<br>나만의 맞추기 게임이 완성돼요.</p>
+  <div class="actions">
+    <button class="btn btn-primary" onclick="goTo('builder')">🎮 게임 만들기</button>
+  </div>
+</div>
+
+<!-- ══ SCREEN 2: 빌더 ══ -->
+<div id="screen-builder" class="screen">
+  <h2>나만의 <span>퀴즈</span> 만들기</h2>
+  <p style="color:var(--muted);font-size:0.95rem">사진을 추가하고 각 사진의 정답을 입력하세요.</p>
+
+  <div class="builder-wrap">
+    <div class="drop-zone" id="dropZone">
+      <div class="dz-icon">📸</div>
+      <p><strong>클릭하거나 사진을 끌어다 놓으세요</strong><br>JPG, PNG, GIF, WEBP 지원 · 여러 장 한 번에 가능</p>
+    </div>
+    <input type="file" id="file-input" accept="image/*" multiple>
+    <div class="card-list" id="cardList"></div>
+  </div>
+
+  <div class="builder-footer">
+    <button class="btn btn-secondary" onclick="goTo('home')">← 홈으로</button>
+    <button class="btn btn-primary" id="startBtn" onclick="startGame()" disabled>▶ 게임 시작</button>
+  </div>
+</div>
+
+<!-- ══ SCREEN 3: 게임 ══ -->
+<div id="screen-game" class="screen">
+  <div class="game-header">
+    <div class="progress-text">
+      <span id="qNum">1</span> / <span id="qTotal">?</span>
+    </div>
+    <button class="btn btn-secondary" style="padding:8px 18px;font-size:0.85rem" onclick="goTo('builder')">✏️ 수정</button>
+  </div>
+
+  <div class="image-box" id="imageBox">
+    <img id="gameImg" src="" alt="퀴즈 이미지">
+  </div>
+
+  <!-- 정답 배너 (전체보기 후 표시) -->
+  <div class="answer-banner" id="answerBanner">
+    <div class="ab-label">정답</div>
+    <div class="ab-answer" id="answerText"></div>
+  </div>
+
+  <!-- 힌트 버튼들 -->
+  <div class="hint-row">
+    <button class="hint-btn" id="hint1" onclick="useHint(1)">조금 더 보기</button>
+    <button class="hint-btn" id="hint2" onclick="useHint(2)" disabled>더 보기</button>
+    <button class="hint-btn reveal" id="hint3" onclick="useHint(3)">🔍 전체 보기</button>
+  </div>
+
+  <!-- 다음 문제 버튼 (전체보기 후 등장) -->
+  <div class="next-row">
+    <button class="btn btn-primary" id="nextBtn" onclick="nextQuestion()" style="display:none">다음 →</button>
+  </div>
+</div>
+
+<!-- ══ SCREEN 4: 마무리 ══ -->
+<div id="screen-result" class="screen">
+  <div class="result-emoji">🎉</div>
+  <h2>모두 봤어요!</h2>
+  <p id="resultMsg"></p>
+  <div class="actions">
+    <button class="btn btn-yellow" onclick="restartGame()">🔄 다시 보기</button>
+    <button class="btn btn-secondary" onclick="goTo('builder')">✏️ 문제 수정</button>
+    <button class="btn btn-secondary" onclick="goTo('home')">🏠 홈으로</button>
+  </div>
+</div>
+
+<script>
+/* ── 전역 상태 ── */
+let items   = [];   // { file, url, answer }
+let queue   = [];   // 셔플 인덱스 배열
+let cur     = 0;
+let revealed = false;  // 현재 문제 전체보기 여부
+
+// 줌 단계: [초기, 힌트1, 힌트2, 전체보기]
+const ZOOM_LEVELS = [5.5, 3.0, 1.8, 1.0];
+let zoomOffsetX = 0;
+let zoomOffsetY = 0;
+
+/* ── 화면 전환 ── */
+function goTo(screen) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + screen).classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+/* ── 떠다니는 배경 이모지 ── */
+(function() {
+  const icons = ['📸','🎯','🌟','🎪','🦋','🍀','✨','🎨','🔍','💡'];
+  const wrap = document.getElementById('floatingIcons');
+  for (let i = 0; i < 18; i++) {
+    const el = document.createElement('div');
+    el.className = 'fi';
+    el.textContent = icons[Math.floor(Math.random() * icons.length)];
+    el.style.left = Math.random() * 100 + 'vw';
+    el.style.animationDuration = (12 + Math.random() * 16) + 's';
+    el.style.animationDelay = -(Math.random() * 20) + 's';
+    el.style.fontSize = (1.2 + Math.random() * 1.8) + 'rem';
+    wrap.appendChild(el);
+  }
+})();
+
+/* ── 파일 업로드 ── */
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag-over');
+  handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+function handleFiles(files) {
+  Array.from(files).forEach(file => {
+    if (!file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const item = { file, url: e.target.result, answer: '' };
+      items.push(item);
+      renderCard(item, items.length - 1);
+      checkStartBtn();
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderCard(item, idx) {
+  const list = document.getElementById('cardList');
+  const card = document.createElement('div');
+  card.className = 'photo-card';
+  card.id = 'card-' + idx;
+  card.innerHTML = `
+    <img class="thumb" src="${item.url}" alt="">
+    <div class="info">
+      <div class="fname">${item.file.name}</div>
+      <input type="text" placeholder="이 사진의 정답은? (예: 마카롱)"
+             oninput="items[${idx}].answer=this.value;checkStartBtn()">
+    </div>
+    <button class="del-btn" onclick="removeItem(${idx})" title="삭제">✕</button>
+  `;
+  list.appendChild(card);
+}
+
+function removeItem(idx) {
+  items.splice(idx, 1);
+  const list = document.getElementById('cardList');
+  list.innerHTML = '';
+  items.forEach((it, i) => renderCard(it, i));
+  checkStartBtn();
+}
+
+function checkStartBtn() {
+  const btn = document.getElementById('startBtn');
+  btn.disabled = !(items.length > 0 && items.every(it => it.answer.trim() !== ''));
+}
+
+/* ── 게임 시작 / 재시작 ── */
+function startGame() {
+  queue = items.map((_, i) => i);
+  shuffle(queue);
+  cur = 0;
+  document.getElementById('qTotal').textContent = queue.length;
+  goTo('game');
+  loadQuestion();
+}
+
+function restartGame() {
+  shuffle(queue);
+  cur = 0;
+  goTo('game');
+  loadQuestion();
+}
+
+/* ── 문제 로드 ── */
+function loadQuestion() {
+  revealed = false;
+
+  const idx = queue[cur];
+  const item = items[idx];
+
+  document.getElementById('qNum').textContent = cur + 1;
+
+  // 정답 배너 숨기기
+  const banner = document.getElementById('answerBanner');
+  banner.classList.remove('visible');
+
+  // 다음 버튼 숨기기
+  document.getElementById('nextBtn').style.display = 'none';
+
+  // 랜덤 확대 위치
+  zoomOffsetX = (Math.random() - 0.5) * 36;
+  zoomOffsetY = (Math.random() - 0.5) * 36;
+
+  const img = document.getElementById('gameImg');
+  img.style.transition = 'none';
+  img.style.objectFit = 'cover';
+  img.src = item.url;
+  img.onload = () => {
+    img.style.transformOrigin = `${50 + zoomOffsetX}% ${50 + zoomOffsetY}%`;
+    img.style.transform = `scale(${ZOOM_LEVELS[0]})`;
+    requestAnimationFrame(() => {
+      img.style.transition = 'transform 0.9s cubic-bezier(0.4, 0, 0.2, 1)';
+    });
+  };
+
+  // 힌트 버튼 초기화
+  document.getElementById('hint1').disabled = false;
+  document.getElementById('hint1').classList.remove('used');
+  document.getElementById('hint2').disabled = true;
+  document.getElementById('hint2').classList.remove('used');
+  document.getElementById('hint3').disabled = false;
+  document.getElementById('hint3').classList.remove('used');
+}
+
+/* ── 힌트 (줌아웃) ── */
+function useHint(level) {
+  if (level === 3 && revealed) return;
+  const img = document.getElementById('gameImg');
+  const s = ZOOM_LEVELS[level];
+
+  if (s === 1.0) {
+    // 전체 공개
+    img.style.transformOrigin = '50% 50%';
+    img.style.transform = 'scale(1)';
+    img.style.objectFit = 'contain';
+    revealAnswer();
+  } else {
+    img.style.transform = `scale(${s})`;
+  }
+
+  const btn = document.getElementById('hint' + level);
+  btn.classList.add('used');
+  btn.disabled = true;
+
+  if (level < 3) {
+    document.getElementById('hint' + (level + 1)).disabled = false;
+    // hint3는 항상 활성 유지
+    document.getElementById('hint3').disabled = false;
+  }
+}
+
+/* ── 정답 공개 ── */
+function revealAnswer() {
+  revealed = true;
+  const idx = queue[cur];
+  const answer = items[idx].answer;
+
+  const banner = document.getElementById('answerBanner');
+  document.getElementById('answerText').textContent = answer;
+  banner.classList.add('visible');
+
+  // 힌트 버튼 모두 비활성
+  ['hint1','hint2','hint3'].forEach(id => {
+    document.getElementById(id).disabled = true;
+  });
+
+  // 다음 버튼 표시
+  const nextBtn = document.getElementById('nextBtn');
+  const isLast = cur >= queue.length - 1;
+  nextBtn.textContent = isLast ? '결과 보기 🎉' : '다음 →';
+  nextBtn.style.display = 'inline-flex';
+}
+
+/* ── 다음 문제 ── */
+function nextQuestion() {
+  cur++;
+  if (cur >= queue.length) {
+    showResult();
+  } else {
+    loadQuestion();
+  }
+}
+
+/* ── 결과 화면 ── */
+function showResult() {
+  goTo('result');
+  document.getElementById('resultMsg').textContent =
+    `${queue.length}장의 사진을 모두 확인했어요!`;
+}
+
+/* ── 유틸 ── */
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+</script>
+</body>
+</html>
