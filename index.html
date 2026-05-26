@@ -284,6 +284,39 @@
     .game-card { flex-wrap:wrap; }
     .game-card-actions { width:100%; justify-content:flex-end; }
   }
+
+  /* ══ 전체보기 모달 ══ */
+  .reveal-modal {
+    display:none;
+    position:fixed; inset:0; z-index:100;
+    background:rgba(0,0,0,0.92);
+    flex-direction:column; align-items:center; justify-content:center;
+    gap:16px; padding:20px;
+  }
+  .reveal-modal.open { display:flex; }
+  .reveal-modal img {
+    max-width:min(96vw, 900px);
+    max-height:70vh;
+    width:auto; height:auto;
+    border-radius:16px;
+    object-fit:contain;
+    display:block;
+    /* 브라우저가 원본 해상도로 렌더링하도록 크기 제한만 걸고 강제 리사이즈 안 함 */
+  }
+  .reveal-modal .modal-answer {
+    font-family:'Black Han Sans',sans-serif;
+    font-size:2rem; color:var(--accent2); text-align:center;
+  }
+  .reveal-modal .modal-label {
+    font-size:0.78rem; letter-spacing:3px; color:var(--muted);
+    text-transform:uppercase; font-weight:700;
+  }
+  .reveal-modal .modal-close {
+    position:absolute; top:20px; right:24px;
+    background:none; border:none; color:var(--muted);
+    font-size:1.8rem; cursor:pointer; line-height:1;
+  }
+  .reveal-modal .modal-close:hover { color:var(--text); }
 </style>
 </head>
 <body>
@@ -698,6 +731,7 @@ function loadQuestion() {
   document.getElementById('qNum').textContent = cur + 1;
   document.getElementById('answerBanner').classList.remove('visible');
   document.getElementById('nextBtn').style.display = 'none';
+  document.getElementById('revealModal').classList.remove('open');
 
   zoomOffsetX = (Math.random() - 0.5) * 36;
   zoomOffsetY = (Math.random() - 0.5) * 36;
@@ -737,12 +771,7 @@ function useHint(level) {
   const s = ZOOM_LEVELS[level];
 
   if (s === 1.0) {
-    img.style.transformOrigin = '50% 50%';
-    img.style.transform = 'scale(1)';  // translate는 CSS translate(-50%,-50%) 유지
-    img.style.objectFit = 'contain';
-    img.style.width = '100%';
-    img.style.height = '100%';
-    revealAnswer();
+    openRevealModal();
   } else {
     const ox = zoomOffsetX * 1.5;
     const oy = zoomOffsetY * 1.5;
@@ -760,12 +789,41 @@ function useHint(level) {
 
 function revealAnswer() {
   revealed = true;
+  // 게임 화면 힌트 버튼 전부 비활성
+  ['hint1','hint2','hint3'].forEach(id => document.getElementById(id).disabled = true);
+  // 정답 배너 표시
   document.getElementById('answerText').textContent = items[queue[cur]].answer;
   document.getElementById('answerBanner').classList.add('visible');
-  ['hint1','hint2','hint3'].forEach(id => document.getElementById(id).disabled = true);
+  // 모달이 닫혔을 때를 위한 게임 화면 다음 버튼 (모달 없이도 진행 가능하도록 유지)
   const nextBtn = document.getElementById('nextBtn');
   nextBtn.textContent = cur >= queue.length - 1 ? '결과 보기 🎉' : '다음 →';
-  nextBtn.style.display = 'inline-flex';
+  nextBtn.style.display = 'none'; // 진행은 모달 버튼으로, 모달 닫으면 아래 버튼 노출
+}
+
+function openRevealModal() {
+  const item = items[queue[cur]];
+  document.getElementById('modalImg').src = item.url;
+  document.getElementById('modalAnswer').textContent = item.answer;
+  const isLast = cur >= queue.length - 1;
+  document.getElementById('modalNextBtn').textContent = isLast ? '결과 보기 🎉' : '다음 →';
+  document.getElementById('revealModal').classList.add('open');
+  revealAnswer(); // 힌트 비활성 + 배너 + 다음버튼 처리
+}
+
+function closeModal() {
+  document.getElementById('revealModal').classList.remove('open');
+  // 모달 ✕로 닫았을 때도 아래 다음 버튼 보이게
+  if (revealed) document.getElementById('nextBtn').style.display = 'inline-flex';
+}
+
+function closeRevealModal(e) {
+  // 배경 클릭 시 닫기
+  if (e.target === document.getElementById('revealModal')) closeModal();
+}
+
+function closeModalAndNext() {
+  closeModal();
+  nextQuestion();
 }
 
 /* ════════════════════════════
@@ -792,5 +850,14 @@ function shuffle(arr) {
   }
 }
 </script>
+
+<!-- ══ 전체보기 모달 ══ -->
+<div class="reveal-modal" id="revealModal" onclick="closeRevealModal(event)">
+  <button class="modal-close" onclick="closeModal()">✕</button>
+  <img id="modalImg" src="" alt="전체 사진">
+  <div class="modal-label">정답</div>
+  <div class="modal-answer" id="modalAnswer"></div>
+  <button class="btn btn-primary" id="modalNextBtn" onclick="closeModalAndNext()">다음 →</button>
+</div>
 </body>
 </html>
